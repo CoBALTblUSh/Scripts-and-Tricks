@@ -1,0 +1,45 @@
+(
+  echo "Paste AWS Access Key ID:"
+  read -r AKID
+
+  echo "Paste AWS Secret Access Key:"
+  read -rs SAK
+  echo
+
+  echo "SES region [us-east-1]:"
+  read -r REGION
+  REGION=${REGION:-us-east-1}
+
+  echo "From email address:"
+  read -r FROM_EMAIL
+
+  echo "To email address:"
+  read -r TO_EMAIL
+
+  cat > /tmp/ses-test-email.json <<EOF
+{
+  "Source": "$FROM_EMAIL",
+  "Destination": {
+    "ToAddresses": ["$TO_EMAIL"]
+  },
+  "Message": {
+    "Subject": {
+      "Data": "AWS SES Test Email",
+      "Charset": "UTF-8"
+    },
+    "Body": {
+      "Text": {
+        "Data": "This is a test email sent through AWS SES using temporary access keys.",
+        "Charset": "UTF-8"
+      }
+    }
+  }
+}
+EOF
+
+  AWS_ACCESS_KEY_ID="$AKID" \
+  AWS_SECRET_ACCESS_KEY="$SAK" \
+  AWS_DEFAULT_REGION="$REGION" \
+  AWS_PAGER="" \
+  aws ses send-email --cli-input-json file:///tmp/ses-test-email.json
+)
