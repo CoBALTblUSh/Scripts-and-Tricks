@@ -1,0 +1,27 @@
+# 1. Dynamically gather the active Security log and all historical archive files
+$LogPaths = @("$env:SystemRoot\System32\Winevt\Logs\Security.evtx")
+if (Test-Path "$env:SystemRoot\System32\Winevt\Logs\Archive-Security*") {
+    $LogPaths += Get-ChildItem "$env:SystemRoot\System32\Winevt\Logs\Archive-Security*" | Select-Object -ExpandProperty FullName
+}
+
+# 2. Query all files using an optimized XPath filter for your IDs
+Get-WinEvent -Path $LogPaths -FilterXPath "*[System[(EventID=4625 or EventID=4648)]]" -ErrorAction SilentlyContinue | ForEach-Object {
+    $xml = [xml]$_.ToXml()
+    
+    # 3. Use your exact XML parsing logic to extract properties
+    if ($_.Id -eq 4625) {
+        $TargetUser = ($xml.Event.EventData.Data | Where-Object {$_.Name -eq "TargetUserName"})."#text"
+        $Process = ($xml.Event.EventData.Data | Where-Object {$_.Name -eq "ProcessName"})."#text"
+    } else {
+        $TargetUser = ($xml.Event.EventData.Data | Where-Object {$_.Name -eq "TargetUserName"})."#text"
+        $Process = ($xml.Event.EventData.Data | Where-Object {$_.Name -eq "CallerProcessName"})."#text"
+    }
+
+    # 4. Generate the custom object matching your layout
+    [PSCustomObject]@{
+        Time           = $_.TimeCreated
+        EventID        = $_.Id
+        AttemptedUser  = $TargetUser
+        TriggerProcess = $Process
+    }
+} | Format-Table -AutoSize
