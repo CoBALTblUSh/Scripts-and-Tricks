@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ticket Redemption Log Analyzer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --navy: #102a43;
+      --blue: #1769e0;
+      --blue-soft: #eaf2ff;
+      --ink: #16202a;
+      --muted: #617184;
+      --line: #d9e2ec;
+      --panel: #ffffff;
+      --bg: #f4f7fb;
+      --green: #13795b;
+      --green-bg: #e9f8f2;
+      --red: #b42318;
+      --red-bg: #fff0ee;
+      --amber: #9a6700;
+      --amber-bg: #fff7db;
+      --purple: #6941c6;
+      --purple-bg: #f3efff;
+      --shadow: 0 14px 40px rgba(16, 42, 67, .09);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .app { min-height: 100vh; }
+
+    header {
+      color: white;
+      background:
+        radial-gradient(circle at 85% 10%, rgba(64, 140, 255, .4), transparent 34%),
+        linear-gradient(125deg, #0d253d 0%, #123b62 62%, #155db1 100%);
+      padding: 32px clamp(18px, 4vw, 56px) 72px;
+    }
+    .header-inner, main { max-width: 1440px; margin: 0 auto; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      margin-bottom: 12px; color: #c9dcf7; font-size: 12px;
+      font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+    }
+    h1 { margin: 0; font-size: clamp(29px, 4vw, 46px); line-height: 1.08; letter-spacing: -.035em; }
+    header p { margin: 12px 0 0; max-width: 770px; color: #dce9f8; line-height: 1.55; }
+
+    main { padding: 0 clamp(14px, 4vw, 48px) 48px; margin-top: -42px; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+
+    .upload-panel { padding: clamp(18px, 3vw, 28px); }
+    .upload-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, .45fr); gap: 22px; align-items: stretch; }
+    .dropzone {
+      min-height: 174px; border: 2px dashed #93b4db; border-radius: 14px;
+      background: #f8fbff; display: grid; place-items: center; padding: 24px;
+      text-align: center; transition: .18s ease;
+    }
+    .dropzone.drag { border-color: var(--blue); background: var(--blue-soft); transform: translateY(-1px); }
+    .drop-icon {
+      width: 48px; height: 48px; margin: 0 auto 11px; border-radius: 13px;
+      display: grid; place-items: center; background: var(--blue-soft); color: var(--blue); font-size: 24px;
+    }
+    .dropzone strong { display: block; font-size: 18px; margin-bottom: 5px; }
+    .dropzone span { color: var(--muted); font-size: 14px; }
+    .dropzone input { display: none; }
+    .side-help { border-left: 1px solid var(--line); padding: 4px 0 4px 22px; }
+    .side-help h2 { margin: 0 0 9px; font-size: 16px; }
+    .side-help p { color: var(--muted); line-height: 1.5; font-size: 13px; margin: 0 0 13px; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .command {
+      position: relative; display: block; padding: 12px 38px 12px 12px; background: #0e1f31;
+      color: #e9f2fc; border-radius: 9px; white-space: pre-wrap; word-break: break-word;
+      font-size: 12px; line-height: 1.45;
+    }
+    .copy-command {
+      position: absolute; right: 7px; top: 7px; border: 0; border-radius: 6px;
+      background: #25435f; color: white; padding: 5px 7px; font-size: 11px;
+    }
+    .privacy { display: flex; gap: 7px; align-items: center; color: var(--green); font-size: 12px; font-weight: 700; margin-top: 12px; }
+
+    .hidden { display: none !important; }
+    .workspace { margin-top: 18px; }
+    .filebar {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 14px 18px; margin-bottom: 14px; box-shadow: none;
+    }
+    .file-meta { min-width: 0; }
+    .file-meta strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-meta span { color: var(--muted); font-size: 12px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      border: 1px solid #b7c7d8; background: white; color: var(--navy); border-radius: 9px;
+      padding: 9px 12px; font-weight: 750; font-size: 13px;
+    }
+    .btn:hover { background: #f3f7fb; }
+    .btn.primary { border-color: var(--blue); background: var(--blue); color: white; }
+    .btn.primary:hover { background: #125abe; }
+
+    .notice {
+      margin-bottom: 14px; padding: 12px 14px; border-radius: 10px;
+      background: var(--amber-bg); color: #6d4c00; border: 1px solid #eed990;
+      font-size: 13px; line-height: 1.45;
+    }
+    .notice.error { background: var(--red-bg); color: var(--red); border-color: #f0b7b1; }
+
+    .stats { display: grid; grid-template-columns: repeat(5, minmax(130px, 1fr)); gap: 12px; margin-bottom: 14px; }
+    .stat { padding: 17px; box-shadow: none; }
+    .stat-label { color: var(--muted); font-size: 12px; font-weight: 750; text-transform: uppercase; letter-spacing: .05em; }
+    .stat-value { margin-top: 6px; font-size: 29px; line-height: 1; font-weight: 850; letter-spacing: -.03em; }
+    .stat-sub { color: var(--muted); font-size: 11px; margin-top: 6px; }
+    .stat.issues .stat-value { color: var(--red); }
+    .stat.missing .stat-value { color: var(--amber); }
+
+    .results-panel { overflow: hidden; box-shadow: none; }
+    .toolbar {
+      display: grid; grid-template-columns: minmax(220px, 1fr) repeat(3, auto); gap: 10px;
+      padding: 15px; border-bottom: 1px solid var(--line); align-items: center;
+    }
+    .searchbox { position: relative; }
+    .searchbox input, select, .number-input {
+      width: 100%; min-height: 40px; border: 1px solid #b8c6d5; border-radius: 9px;
+      background: white; color: var(--ink); padding: 8px 10px;
+    }
+    .searchbox input { padding-left: 34px; }
+    .searchbox::before { content: "⌕"; position: absolute; left: 11px; top: 7px; color: var(--muted); font-size: 20px; }
+    .gap-control { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .gap-control input { width: 62px; }
+    .table-wrap { overflow: auto; max-height: 64vh; }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1040px; }
+    th {
+      position: sticky; top: 0; z-index: 2; background: #f6f9fc; color: #4d6175;
+      font-size: 11px; text-transform: uppercase; letter-spacing: .045em; text-align: left;
+      padding: 11px 12px; border-bottom: 1px solid var(--line); white-space: nowrap;
+    }
+    td { padding: 12px; border-bottom: 1px solid #e9eef4; font-size: 13px; vertical-align: middle; }
+    tbody tr:hover { background: #f9fbfd; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .timestamp { white-space: nowrap; color: #40556a; }
+    .identifier { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+    .muted { color: var(--muted); }
+    .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 8px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+    .badge.match { color: var(--green); background: var(--green-bg); }
+    .badge.missed { color: var(--red); background: var(--red-bg); }
+    .badge.over { color: var(--purple); background: var(--purple-bg); }
+    .badge.review { color: var(--amber); background: var(--amber-bg); }
+    .empty { text-align: center; padding: 58px 20px; color: var(--muted); }
+    .empty strong { display: block; color: var(--navy); font-size: 18px; margin-bottom: 5px; }
+    .footnote { padding: 12px 15px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--line); }
+
+    dialog { width: min(900px, calc(100vw - 28px)); max-height: 86vh; border: 0; padding: 0; border-radius: 15px; box-shadow: 0 30px 90px rgba(0,0,0,.28); }
+    dialog::backdrop { background: rgba(8, 22, 36, .6); backdrop-filter: blur(2px); }
+    .dialog-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 17px 20px; border-bottom: 1px solid var(--line); }
+    .dialog-head h2 { margin: 0; font-size: 18px; }
+    .close { border: 0; background: #edf2f7; color: var(--navy); width: 32px; height: 32px; border-radius: 8px; font-size: 19px; }
+    .dialog-body { padding: 18px 20px 22px; overflow: auto; max-height: calc(86vh - 68px); }
+    .session-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+    .mini { background: #f5f8fb; border-radius: 9px; padding: 10px; }
+    .mini span { display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; }
+    .mini strong { display: block; margin-top: 3px; }
+    pre { background: #0d1b2a; color: #d8e6f4; padding: 13px; border-radius: 9px; white-space: pre-wrap; word-break: break-word; font-size: 11px; line-height: 1.5; }
+
+    @media (max-width: 900px) {
+      .upload-grid { grid-template-columns: 1fr; }
+      .side-help { border-left: 0; border-top: 1px solid var(--line); padding: 18px 0 0; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .stats .stat:first-child { grid-column: span 2; }
+      .toolbar { grid-template-columns: 1fr 1fr; }
+      .searchbox { grid-column: span 2; }
+    }
+    @media (max-width: 560px) {
+      header { padding-top: 24px; }
+      main { padding-left: 10px; padding-right: 10px; }
+      .stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .stat { padding: 13px; }
+      .filebar { align-items: flex-start; flex-direction: column; }
+      .toolbar { grid-template-columns: 1fr; }
+      .searchbox { grid-column: auto; }
+      .gap-control { justify-content: space-between; }
+      .session-summary { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="header-inner">
+        <div class="eyebrow">MoMath · Ticketing Operations</div>
+        <h1>Ticket Redemption Log Analyzer</h1>
+        <p>Inspect Docker logs from <code>ticketing-kiosk-api-prod</code>, reconstruct redemption sessions, and immediately find tickets that were not dispensed as expected.</p>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel upload-panel" id="uploadPanel">
+        <div class="upload-grid">
+          <label class="dropzone" id="dropzone">
+            <input id="fileInput" type="file" accept=".log,.txt,.json,.jsonl,text/plain,application/json" multiple>
+            <div>
+              <div class="drop-icon">⇧</div>
+              <strong>Drop Docker log files here</strong>
+              <span>or click to select .log, .txt, .json, or .jsonl files</span>
+            </div>
+          </label>
+          <div class="side-help">
+            <h2>Create today’s log file</h2>
+            <p>Run this on <code>tech02</code>, then open the resulting file here.</p>
+            <code class="command" id="commandText">docker logs ticketing-kiosk-api-prod --since "$(date +%Y-%m-%dT00:00:00)" --timestamps > ticketing-redemptions-today.log 2>&amp;1<button class="copy-command" id="copyCommand" type="button">Copy</button></code>
+            <div class="privacy">● Processed locally in your browser</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace hidden" id="workspace">
+        <div class="panel filebar">
+          <div class="file-meta">
+            <strong id="fileName">No file loaded</strong>
+            <span id="parseMeta"></span>
+          </div>
+          <div class="actions">
+            <button class="btn" id="newFile" type="button">Open another file</button>
+            <button class="btn" id="exportAll" type="button">Export all CSV</button>
+            <button class="btn primary" id="exportIssues" type="button">Export issues CSV</button>
+          </div>
+        </div>
+
+        <div class="notice hidden" id="notice"></div>
+
+        <div class="stats">
+          <article class="panel stat">
+            <div class="stat-label">Sessions</div>
+            <div class="stat-value" id="statSessions">0</div>
+            <div class="stat-sub">redemption sessions reconstructed</div>
+          </article>
+          <article class="panel stat">
+            <div class="stat-label">Expected</div>
+            <div class="stat-value" id="statExpected">0</div>
+            <div class="stat-sub">tickets requested</div>
+          </article>
+          <article class="panel stat">
+            <div class="stat-label">Dispensed</div>
+            <div class="stat-value" id="statDispensed">0</div>
+            <div class="stat-sub">tickets confirmed in logs</div>
+          </article>
+          <article class="panel stat missing">
+            <div class="stat-label">Missed</div>
+            <div class="stat-value" id="statMissed">0</div>
+            <div class="stat-sub">expected minus dispensed</div>
+          </article>
+          <article class="panel stat issues">
+            <div class="stat-label">Issue sessions</div>
+            <div class="stat-value" id="statIssues">0</div>
+            <div class="stat-sub">missed, over, or needs review</div>
+          </article>
+        </div>
+
+        <section class="panel results-panel">
+          <div class="toolbar">
+            <div class="searchbox"><input id="search" type="search" placeholder="Search kiosk, dispenser, session, or message"></div>
+            <select id="statusFilter" aria-label="Filter by result">
+              <option value="all">All results</option>
+              <option value="issues">Issues only</option>
+              <option value="missed">Missed</option>
+              <option value="over">Over-dispensed</option>
+              <option value="match">Matched</option>
+              <option value="review">Needs review</option>
+            </select>
+            <select id="dateFilter" aria-label="Filter by date">
+              <option value="all">All dates</option>
+              <option value="today">Today</option>
+            </select>
+            <label class="gap-control">Session gap
+              <input class="number-input" id="gapSeconds" type="number" min="1" max="120" value="6" step="1"> sec
+            </label>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Time</th>
+                  <th>Kiosk</th>
+                  <th>Dispenser</th>
+                  <th>Session / transaction</th>
+                  <th class="num">Expected</th>
+                  <th class="num">Dispensed</th>
+                  <th class="num">Difference</th>
+                  <th>Evidence</th>
+                </tr>
+              </thead>
+              <tbody id="resultsBody"></tbody>
+            </table>
+            <div class="empty hidden" id="emptyState"><strong>No matching sessions</strong>Try a different filter or inspect the source log.</div>
+          </div>
+          <div class="footnote" id="footnote"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="rawDialog">
+    <div class="dialog-head">
+      <h2>Session evidence</h2>
+      <button class="close" id="closeDialog" type="button" aria-label="Close">×</button>
+    </div>
+    <div class="dialog-body" id="dialogBody"></div>
+  </dialog>
+
+  <script>
+  (() => {
+    "use strict";
+
+    const $ = (id) => document.getElementById(id);
+    const state = { rawFiles: [], records: [], sessions: [], parsedLines: 0, totalLines: 0, candidateLines: 0 };
+
+    const keys = {
+      kiosk: ["kioskid", "kiosk_id", "kiosk", "terminalid", "terminal_id", "stationid", "station_id"],
+      expected: ["ticketstoprint", "tickets_to_print", "expectedtickets", "expected_tickets", "ticketsrequested", "tickets_requested", "quantitytoprint", "quantity_to_print"],
+      printed: ["printed", "ticketsprinted", "tickets_printed", "dispensed", "dispensedcount", "dispensed_count", "actualprinted", "actual_printed", "ticketsdispensed", "tickets_dispensed"],
+      dispenser: ["dispensertype", "dispenser_type", "dispenser", "dispenserid", "dispenser_id", "tickettype", "ticket_type", "pricecategory", "price_category"],
+      session: ["redemptionid", "redemption_id", "transactionid", "transaction_id", "sessionid", "session_id", "requestid", "request_id", "orderid", "order_id", "saleid", "sale_id"],
+      timestamp: ["@timestamp", "timestamp", "time", "datetime", "date", "createdat", "created_at"],
+      message: ["message", "msg", "renderedmessage", "rendered_message", "messagetemplate", "message_template", "event", "eventname", "event_name"]
+    };
+
+    function normalizeKey(value) { return String(value).toLowerCase().replace(/[^a-z0-9_@]/g, ""); }
+    function asNumber(value) {
+      if (typeof value === "number" && Number.isFinite(value)) return value;
+      if (typeof value === "string" && value.trim() !== "" && /^-?\d+(?:\.\d+)?$/.test(value.trim())) return Number(value);
+      return null;
+    }
+    function safeString(value) {
+      if (value == null) return "";
+      if (typeof value === "string") return value;
+      try { return JSON.stringify(value); } catch { return String(value); }
+    }
+    function escapeHTML(value) {
+      return safeString(value).replace(/[&<>'"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"})[ch]);
+    }
+    function traverse(value, callback, seen = new Set(), depth = 0) {
+      if (depth > 8 || value == null || typeof value !== "object" || seen.has(value)) return;
+      seen.add(value);
+      for (const [key, child] of Object.entries(value)) {
+        callback(key, child);
+        if (child && typeof child === "object") traverse(child, callback, seen, depth + 1);
+      }
+    }
+    function findValue(obj, candidates) {
+      let result;
+      const wanted = new Set(candidates.map(normalizeKey));
+      traverse(obj, (key, value) => {
+        if (result === undefined && wanted.has(normalizeKey(key)) && value != null && typeof value !== "object") result = value;
+      });
+      return result;
+    }
+    function expandEmbeddedJSON(obj) {
+      const additions = [];
+      traverse(obj, (key, value) => {
+        if (typeof value !== "string") return;
+        const trimmed = value.trim();
+        if (!((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]")))) return;
+        try { additions.push(JSON.parse(trimmed)); } catch { /* ordinary message */ }
+      });
+      return additions.length ? { original: obj, embedded: additions } : obj;
+    }
+    function parseJSONCandidate(text) {
+      const trimmed = text.trim();
+      try { return JSON.parse(trimmed); } catch { /* try substring */ }
+      const first = trimmed.indexOf("{");
+      const last = trimmed.lastIndexOf("}");
+      if (first >= 0 && last > first) {
+        try { return JSON.parse(trimmed.slice(first, last + 1)); } catch { /* not JSON */ }
+      }
+      return null;
+    }
+    function timestampFromLine(line, obj) {
+      const prefix = line.match(/^\s*(?:\[)?(\d{4}-\d{2}-\d{2}[T ][0-9:.+-]+Z?)(?:\])?\s*/);
+      const raw = prefix?.[1] || findValue(obj, keys.timestamp);
+      if (!raw) return { raw: "", date: null };
+      const date = new Date(raw);
+      return { raw: safeString(raw), date: Number.isNaN(date.getTime()) ? null : date };
+    }
+    function inferCountsFromText(text) {
+      const result = { expected: null, printed: null };
+      let match = text.match(/(?:ticket|badge)\s*(\d+)\s*(?:of|\/)\s*(\d+)/i);
+      if (match) { result.printed = Number(match[1]); result.expected = Number(match[2]); return result; }
+      match = text.match(/(?:printed|dispensed|redeemed)\D{0,16}(\d+)\s*(?:of|\/)\s*(\d+)/i);
+      if (match) { result.printed = Number(match[1]); result.expected = Number(match[2]); }
+      return result;
+    }
+    function parseLine(raw, lineNumber, fileName) {
+      const line = raw.replace(/\r$/, "");
+      if (!line.trim()) return null;
+      const obj0 = parseJSONCandidate(line);
+      const obj = obj0 ? expandEmbeddedJSON(obj0) : {};
+      const messageValues = [];
+      traverse(obj, (key, value) => {
+        if (keys.message.includes(normalizeKey(key)) && value != null) messageValues.push(safeString(value));
+      });
+      const message = messageValues.join(" · ") || line;
+      const inferred = inferCountsFromText(message);
+      const expected = asNumber(findValue(obj, keys.expected)) ?? inferred.expected;
+      const printed = asNumber(findValue(obj, keys.printed)) ?? inferred.printed;
+      const kiosk = safeString(findValue(obj, keys.kiosk)) || inferFromText(message, /\bkiosk(?:id)?\s*[=:]\s*["']?([\w.-]+)/i);
+      const dispenser = safeString(findValue(obj, keys.dispenser)) || inferFromText(message, /\bdispenser(?:type|id)?\s*[=:]\s*["']?([\w .-]+)/i);
+      const sessionId = safeString(findValue(obj, keys.session));
+      const ticketSignal = expected != null || printed != null || /\b(ticket|badge).{0,30}(dispens|print|redeem)|\b(dispens|print|redeem).{0,30}(ticket|badge)/i.test(message);
+      const successEvent = /ticket dispensed successfully|successfully dispensed|dispense confirmed|redemption confirmed/i.test(message);
+      if (!ticketSignal || (expected == null && printed == null && !successEvent)) return { parsed: !!obj0, candidate: false };
+      const ts = timestampFromLine(line, obj);
+      return {
+        parsed: !!obj0, candidate: true, lineNumber, fileName, raw: line,
+        timestampRaw: ts.raw, date: ts.date, kiosk: kiosk || "Unknown kiosk",
+        dispenser: dispenser || "Unknown dispenser", sessionId,
+        expected, printed, successEvent, message
+      };
+    }
+    function inferFromText(text, regex) { const match = text.match(regex); return match ? match[1] : ""; }
+
+    function newSession(record, id) {
+      return {
+        id, explicitId: record.sessionId || "", kiosk: record.kiosk, dispenser: record.dispenser,
+        start: record.date, end: record.date, timestampRaw: record.timestampRaw,
+        expected: record.expected, printedMax: record.printed, successEvents: record.successEvent ? 1 : 0,
+        records: [record], firstLine: record.lineNumber, lastLine: record.lineNumber, warnings: []
+      };
+    }
+    function addRecord(session, record) {
+      session.records.push(record);
+      session.lastLine = record.lineNumber;
+      if (!session.start && record.date) session.start = record.date;
+      if (record.date && (!session.end || record.date > session.end)) session.end = record.date;
+      if (record.expected != null) {
+        if (session.expected != null && record.expected !== session.expected && !session.warnings.includes("Conflicting expected counts")) session.warnings.push("Conflicting expected counts");
+        session.expected = Math.max(session.expected ?? 0, record.expected);
+      }
+      if (record.printed != null) session.printedMax = Math.max(session.printedMax ?? 0, record.printed);
+      if (record.successEvent) session.successEvents += 1;
+    }
+    function secondsBetween(a, b) {
+      if (!a || !b) return null;
+      return Math.abs(a.getTime() - b.getTime()) / 1000;
+    }
+    function startsNewSession(current, record, gap) {
+      if (!current) return true;
+      const seconds = secondsBetween(current.end, record.date);
+      if (seconds != null && seconds > gap) return true;
+      const currentActual = Math.max(current.printedMax ?? 0, current.successEvents);
+      if (record.printed != null && currentActual > 0 && record.printed <= 1 && record.printed < currentActual) return true;
+      if (current.expected != null && currentActual >= current.expected && record.printed != null && record.printed <= 1) return true;
+      if (/\b(start(?:ing)?|request(?:ed)?|begin|initiated)\b.{0,35}\b(ticket|dispens|print|redeem)/i.test(record.message) && current.records.length > 0) return true;
+      return false;
+    }
+    function finalizeSession(session) {
+      const eventFallback = session.printedMax == null ? session.successEvents : 0;
+      const actual = session.printedMax ?? eventFallback;
+      const expected = session.expected;
+      let status = "review";
+      if (expected != null) {
+        if (actual === expected) status = "match";
+        else if (actual < expected) status = "missed";
+        else status = "over";
+      }
+      return {
+        ...session, actual, status,
+        difference: expected == null ? null : actual - expected,
+        missed: expected == null ? 0 : Math.max(expected - actual, 0)
+      };
+    }
+    function buildSessions(records, gap) {
+      const sessions = [];
+      const explicit = new Map();
+      const active = new Map();
+      let counter = 0;
+      for (const record of records) {
+        const base = `${record.kiosk}||${record.dispenser}`;
+        if (record.sessionId) {
+          const key = `${base}||${record.sessionId}`;
+          if (!explicit.has(key)) explicit.set(key, newSession(record, `S${++counter}`));
+          else addRecord(explicit.get(key), record);
+          continue;
+        }
+        const current = active.get(base);
+        if (startsNewSession(current, record, gap)) {
+          const created = newSession(record, `S${++counter}`);
+          active.set(base, created);
+          sessions.push(created);
+        } else addRecord(current, record);
+      }
+      for (const session of explicit.values()) sessions.push(session);
+      return sessions.map(finalizeSession).sort((a, b) => {
+        if (a.start && b.start) return a.start - b.start;
+        return a.firstLine - b.firstLine;
+      });
+    }
+
+    async function loadFiles(files) {
+      if (!files.length) return;
+      state.rawFiles = [];
+      state.records = [];
+      state.totalLines = state.parsedLines = state.candidateLines = 0;
+      let globalLine = 0;
+      for (const file of files) {
+        const text = await file.text();
+        state.rawFiles.push({ name: file.name, size: file.size, text });
+        const lines = text.split(/\n/);
+        state.totalLines += lines.length;
+        for (const raw of lines) {
+          globalLine++;
+          const result = parseLine(raw, globalLine, file.name);
+          if (!result) continue;
+          if (result.parsed) state.parsedLines++;
+          if (result.candidate) { state.records.push(result); state.candidateLines++; }
+        }
+      }
+      rebuild();
+      $("uploadPanel").classList.add("hidden");
+      $("workspace").classList.remove("hidden");
+      $("fileName").textContent = files.length === 1 ? files[0].name : `${files.length} log files combined`;
+      const size = state.rawFiles.reduce((sum, f) => sum + f.size, 0);
+      $("parseMeta").textContent = `${formatBytes(size)} · ${state.totalLines.toLocaleString()} lines · ${state.candidateLines.toLocaleString()} ticket-event lines`;
+      showParseNotice();
+    }
+    function rebuild() {
+      const gap = Math.max(1, Number($("gapSeconds").value) || 6);
+      state.sessions = buildSessions(state.records, gap);
+      updateStats();
+      renderTable();
+    }
+    function showParseNotice() {
+      const notice = $("notice");
+      if (!state.candidateLines) {
+        notice.className = "notice error";
+        notice.textContent = "No ticket redemption or dispense events were detected. Confirm this is output from ticketing-kiosk-api-prod and that the application wrote redemption events to stdout.";
+      } else if (state.sessions.some(s => s.status === "review")) {
+        notice.className = "notice";
+        notice.textContent = "Some sessions need review because the logs contained dispense activity but no ticketsToPrint value. Open Evidence to inspect those lines.";
+      } else notice.className = "notice hidden";
+    }
+    function updateStats() {
+      const expected = state.sessions.reduce((sum, s) => sum + (s.expected ?? 0), 0);
+      const dispensed = state.sessions.reduce((sum, s) => sum + s.actual, 0);
+      const missed = state.sessions.reduce((sum, s) => sum + s.missed, 0);
+      const issues = state.sessions.filter(s => s.status !== "match").length;
+      $("statSessions").textContent = state.sessions.length.toLocaleString();
+      $("statExpected").textContent = expected.toLocaleString();
+      $("statDispensed").textContent = dispensed.toLocaleString();
+      $("statMissed").textContent = missed.toLocaleString();
+      $("statIssues").textContent = issues.toLocaleString();
+    }
+    function isToday(date) {
+      if (!date) return false;
+      const now = new Date();
+      return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
+    }
+    function filteredSessions() {
+      const query = $("search").value.trim().toLowerCase();
+      const status = $("statusFilter").value;
+      const date = $("dateFilter").value;
+      return state.sessions.filter(session => {
+        if (status === "issues" && session.status === "match") return false;
+        if (status !== "all" && status !== "issues" && session.status !== status) return false;
+        if (date === "today" && !isToday(session.start)) return false;
+        if (query) {
+          const haystack = [session.kiosk, session.dispenser, session.explicitId, session.id, ...session.records.map(r => r.message)].join(" ").toLowerCase();
+          if (!haystack.includes(query)) return false;
+        }
+        return true;
+      });
+    }
+    function renderTable() {
+      const rows = filteredSessions();
+      const body = $("resultsBody");
+      body.innerHTML = "";
+      for (const session of rows) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><span class="badge ${session.status}">${statusLabel(session.status)}</span></td>
+          <td class="timestamp">${escapeHTML(formatTimestamp(session.start, session.timestampRaw, session.firstLine))}</td>
+          <td><strong>${escapeHTML(session.kiosk)}</strong></td>
+          <td>${escapeHTML(session.dispenser)}</td>
+          <td class="identifier">${escapeHTML(session.explicitId || session.id)}</td>
+          <td class="num">${session.expected == null ? '<span class="muted">—</span>' : session.expected}</td>
+          <td class="num">${session.actual}</td>
+          <td class="num">${session.difference == null ? '<span class="muted">—</span>' : signed(session.difference)}</td>
+          <td><button class="btn evidence" type="button" data-id="${escapeHTML(session.id)}">View ${session.records.length} line${session.records.length === 1 ? "" : "s"}</button></td>`;
+        body.appendChild(tr);
+      }
+      $("emptyState").classList.toggle("hidden", rows.length !== 0);
+      $("footnote").textContent = `Showing ${rows.length.toLocaleString()} of ${state.sessions.length.toLocaleString()} sessions. A session is grouped by transaction ID when available, otherwise by kiosk + dispenser within the configured time gap.`;
+      body.querySelectorAll(".evidence").forEach(button => button.addEventListener("click", () => openEvidence(button.dataset.id)));
+    }
+    function statusLabel(status) { return ({ match: "Matched", missed: "Missed", over: "Over-dispensed", review: "Needs review" })[status] || status; }
+    function signed(value) { return value > 0 ? `+${value}` : String(value); }
+    function formatTimestamp(date, raw, line) {
+      if (date) return date.toLocaleString([], { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit" });
+      return raw || `Line ${line}`;
+    }
+    function formatBytes(bytes) {
+      if (!bytes) return "0 B";
+      const units = ["B", "KB", "MB", "GB"];
+      const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+      return `${(bytes / Math.pow(1024, i)).toFixed(i ? 1 : 0)} ${units[i]}`;
+    }
+    function openEvidence(id) {
+      const session = state.sessions.find(s => s.id === id);
+      if (!session) return;
+      const body = $("dialogBody");
+      body.innerHTML = `
+        <div class="session-summary">
+          <div class="mini"><span>Kiosk</span><strong>${escapeHTML(session.kiosk)}</strong></div>
+          <div class="mini"><span>Dispenser</span><strong>${escapeHTML(session.dispenser)}</strong></div>
+          <div class="mini"><span>Expected</span><strong>${session.expected ?? "Unknown"}</strong></div>
+          <div class="mini"><span>Dispensed</span><strong>${session.actual}</strong></div>
+        </div>
+        ${session.warnings.length ? `<div class="notice">${escapeHTML(session.warnings.join("; "))}</div>` : ""}
+        <pre>${escapeHTML(session.records.map(r => `[${r.fileName}:${r.lineNumber}] ${r.raw}`).join("\n\n"))}</pre>`;
+      $("rawDialog").showModal();
+    }
+    function csvCell(value) { return `"${safeString(value).replace(/"/g, '""')}"`; }
+    function exportCSV(issuesOnly) {
+      const sessions = issuesOnly ? state.sessions.filter(s => s.status !== "match") : state.sessions;
+      const headers = ["status", "time", "kiosk", "dispenser", "session_or_transaction", "expected", "dispensed", "difference", "missed", "source_lines", "evidence"];
+      const rows = sessions.map(s => [
+        statusLabel(s.status), s.start?.toISOString() || s.timestampRaw || `Line ${s.firstLine}`,
+        s.kiosk, s.dispenser, s.explicitId || s.id, s.expected ?? "", s.actual,
+        s.difference ?? "", s.missed, s.records.length, s.records.map(r => r.raw).join(" || ")
+      ]);
+      const csv = [headers, ...rows].map(row => row.map(csvCell).join(",")).join("\r\n");
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadBlob(csv, `ticket-redemption-${issuesOnly ? "issues" : "analysis"}-${stamp}.csv`, "text/csv;charset=utf-8");
+    }
+    function downloadBlob(content, filename, type) {
+      const url = URL.createObjectURL(new Blob([content], { type }));
+      const anchor = document.createElement("a");
+      anchor.href = url; anchor.download = filename; document.body.appendChild(anchor); anchor.click(); anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    // Small public API for offline validation and integrations. The page itself
+    // uses the same parser and session builder through the upload workflow.
+    window.TicketRedemptionLogAnalyzer = {
+      analyzeText(text, options = {}) {
+        const fileName = options.fileName || "docker.log";
+        const gapSeconds = Math.max(1, Number(options.gapSeconds) || 6);
+        const records = [];
+        const lines = String(text || "").split(/\n/);
+        lines.forEach((line, index) => {
+          const result = parseLine(line, index + 1, fileName);
+          if (result?.candidate) records.push(result);
+        });
+        return { totalLines: lines.length, candidateLines: records.length, sessions: buildSessions(records, gapSeconds) };
+      }
+    };
+
+    const dropzone = $("dropzone");
+    ["dragenter", "dragover"].forEach(event => dropzone.addEventListener(event, e => { e.preventDefault(); dropzone.classList.add("drag"); }));
+    ["dragleave", "drop"].forEach(event => dropzone.addEventListener(event, e => { e.preventDefault(); dropzone.classList.remove("drag"); }));
+    dropzone.addEventListener("drop", e => loadFiles([...e.dataTransfer.files]));
+    $("fileInput").addEventListener("change", e => loadFiles([...e.target.files]));
+    $("newFile").addEventListener("click", () => $("fileInput").click());
+    $("search").addEventListener("input", renderTable);
+    $("statusFilter").addEventListener("change", renderTable);
+    $("dateFilter").addEventListener("change", renderTable);
+    $("gapSeconds").addEventListener("change", rebuild);
+    $("exportAll").addEventListener("click", () => exportCSV(false));
+    $("exportIssues").addEventListener("click", () => exportCSV(true));
+    $("closeDialog").addEventListener("click", () => $("rawDialog").close());
+    $("rawDialog").addEventListener("click", e => { if (e.target === $("rawDialog")) $("rawDialog").close(); });
+    $("copyCommand").addEventListener("click", async e => {
+      e.preventDefault();
+      const text = $("commandText").childNodes[0].textContent;
+      try { await navigator.clipboard.writeText(text); e.currentTarget.textContent = "Copied"; setTimeout(() => e.currentTarget.textContent = "Copy", 1200); }
+      catch { e.currentTarget.textContent = "Select"; }
+    });
+  })();
+  </script>
+</body>
+</html>
