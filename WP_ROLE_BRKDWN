@@ -1,0 +1,38 @@
+sudo -u www-data wp --path=/home/momath/public_html eval '
+global $wp_roles;
+
+foreach ($wp_roles->roles as $role_key => $role_data) {
+
+    $matches = [];
+
+    foreach ($role_data["capabilities"] as $cap => $allowed) {
+        if (!$allowed) {
+            continue;
+        }
+
+        if (
+            stripos($cap, "civi") !== false ||
+            stripos($cap, "event") !== false ||
+            stripos($cap, "participant") !== false ||
+            stripos($cap, "register") !== false
+        ) {
+            $matches[] = $cap;
+        }
+    }
+
+    if (!$matches) {
+        continue;
+    }
+
+    sort($matches);
+
+    echo "\n";
+    echo "================================================================================\n";
+    printf("ROLE: %s (%s)\n", $role_data["name"], $role_key);
+    echo "================================================================================\n";
+
+    foreach ($matches as $cap) {
+        printf("  %-55s YES\n", $cap);
+    }
+}
+'
