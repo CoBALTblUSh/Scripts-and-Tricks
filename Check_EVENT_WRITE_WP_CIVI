@@ -1,0 +1,61 @@
+sudo -u www-data wp --path=/home/momath/public_html eval '
+$users = get_users([
+    "orderby" => "login",
+    "order"   => "ASC",
+]);
+
+$rows = [];
+
+foreach ($users as $user) {
+    $access   = user_can($user, "access_civievent");
+    $register = user_can($user, "register_for_events");
+    $edit     = user_can($user, "edit_event_participants");
+
+    if ($access || $register || $edit) {
+        $rows[] = [
+            $user->ID,
+            $user->user_login,
+            $user->user_email,
+            implode(",", $user->roles),
+            $access   ? "YES" : "-",
+            $register ? "YES" : "-",
+            $edit     ? "YES" : "-",
+        ];
+    }
+}
+
+printf(
+    "%-6s %-24s %-38s %-24s %-10s %-10s %-10s\n",
+    "ID",
+    "USERNAME",
+    "EMAIL",
+    "ROLE",
+    "CIVIEVENT",
+    "REGISTER",
+    "EDIT"
+);
+
+printf(
+    "%-6s %-24s %-38s %-24s %-10s %-10s %-10s\n",
+    str_repeat("-", 6),
+    str_repeat("-", 24),
+    str_repeat("-", 38),
+    str_repeat("-", 24),
+    str_repeat("-", 10),
+    str_repeat("-", 10),
+    str_repeat("-", 10)
+);
+
+foreach ($rows as $row) {
+    printf(
+        "%-6s %-24s %-38s %-24s %-10s %-10s %-10s\n",
+        $row[0],
+        substr($row[1], 0, 24),
+        substr($row[2], 0, 38),
+        substr($row[3], 0, 24),
+        $row[4],
+        $row[5],
+        $row[6]
+    );
+}
+'
